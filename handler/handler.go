@@ -5,22 +5,48 @@ import (
 	"github.com/google/uuid"
 	"github.com/kuusminustwo/go_rest_api/database"
 	"github.com/kuusminustwo/go_rest_api/model"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func CreateUser(c *fiber.Ctx) error {
 	db := database.DB.Db
 	user := new(model.User)
-	err := c.BodyParser(user)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"status": "error", "message": "Something's wrong with your input", "data": err})
-	}
-	err = db.Create(&user).Error
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"status": "error", "message": "Could not create user", "data": err})
-	}
-	return c.Status(201).JSON(fiber.Map{"status": "success", "message": "User has created", "data": user})
-}
 
+	// Parse request body into User struct
+	if err := c.BodyParser(user); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "error",
+			"message": "Invalid request body",
+			"data":    err,
+		})
+	}
+
+	// Hash the password before storing it
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "error",
+			"message": "Failed to hash password",
+			"data":    err,
+		})
+	}
+	user.Password = string(hashedPassword)
+
+	// Store user in database
+	if err := db.Create(&user).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "error",
+			"message": "Could not create user",
+			"data":    err,
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"status":  "success",
+		"message": "User has been created",
+		"data":    user,
+	})
+}
 func GetAllUsers(c *fiber.Ctx) error {
 	db := database.DB.Db
 	var users []model.User
@@ -76,4 +102,15 @@ func DeleteUserByID(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"status": "error", "message": "Failed to delete user", "data": nil})
 	}
 	return c.Status(200).JSON(fiber.Map{"status": "success", "message": "User deleted"})
+}
+
+func GetUserProfile(c *fiber.Ctx) error {
+	// Access authenticated user from context
+	user := c.Locals("user").(model.User)
+	// Proceed with handling the request using the authenticated user information
+	return c.JSON(fiber.Map{
+		"status":  "success",
+		"message": "User profile retrieved",
+		"data":    user,
+	})
 }
