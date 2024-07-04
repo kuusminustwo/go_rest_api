@@ -25,4 +25,7 @@ func SetupRoutes(app *fiber.App) {
 	v1.Delete("/:id", handler.DeleteUserByID)
 	api.Post("/login", handler.Login)
 	api.Get("/profile", middleware.TokenAuthMiddleware, handler.GetUserProfile)
+	api.Get("/tod", middleware.TokenAuthMiddleware, handler.GetUserProfile)
+	api.Get("/dun", middleware.TokenAuthMiddleware, handler.GetStudentEnrollments)
+	api.Get("/hicheel", middleware.TokenAuthMiddleware, handler.GetUserProfile)
 }

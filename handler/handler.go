@@ -107,10 +107,56 @@ func DeleteUserByID(c *fiber.Ctx) error {
 func GetUserProfile(c *fiber.Ctx) error {
 	// Access authenticated user from context
 	user := c.Locals("user").(model.User)
-	// Proceed with handling the request using the authenticated user information
-	return c.JSON(fiber.Map{
+
+	// Preload student data
+	db := database.DB.Db
+	var student model.Student
+	if err := db.First(&student, "user_id = ?", user.ID).Error; err != nil {
+		// Handle error if student data not found
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "error",
+			"message": "Failed to fetch student data",
+			"data":    err.Error(),
+		})
+	}
+
+	// Create response structure including both user and student data
+	response := fiber.Map{
 		"status":  "success",
 		"message": "User profile retrieved",
-		"data":    user,
+		"data": fiber.Map{
+			"user":    user,
+			"student": student,
+		},
+	}
+
+	// Return the combined data as JSON response
+	return c.JSON(response)
+}
+
+func GetStudentEnrollments(c *fiber.Ctx) error {
+	// Extract the user from the context
+	user := c.Locals("user").(model.User)
+
+	// Find the student associated with the user
+	db := database.DB.Db
+	var student model.Student
+	if err := db.Where("user_id = ?", user.ID).First(&student).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Student not found",
+		})
+	}
+
+	// Get the enrollments for the student
+	enrollments, err := model.GetEnrollmentsByStudentID(db, student.ID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve enrollments",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"student":     student,
+		"enrollments": enrollments,
 	})
 }
